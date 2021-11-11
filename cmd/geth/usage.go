@@ -188,6 +188,8 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.MinerExtraDataFlag,
 			utils.MinerRecommitIntervalFlag,
 			utils.MinerNoVerifyFlag,
+			utils.MinerMaxMergedBundlesFlag,
+			utils.MinerTrustedRelaysFlag,
 		},
 	},
 	{
