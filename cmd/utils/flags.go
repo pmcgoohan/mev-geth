@@ -383,6 +383,11 @@ var (
 		Usage: "Maximum amount of time non-executable transaction are queued",
 		Value: ethconfig.Defaults.TxPool.Lifetime,
 	}
+	TxPoolPrivateLifetimeFlag = cli.DurationFlag{
+		Name:  "txpool.privatelifetime",
+		Usage: "Maximum amount of time private transactions are withheld from public broadcasting",
+		Value: ethconfig.Defaults.TxPool.PrivateTxLifetime,
+	}
 	// Performance tuning settings
 	CacheFlag = cli.IntFlag{
 		Name:  "cache",
@@ -1348,6 +1353,9 @@ func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
 	}
 	if ctx.GlobalIsSet(TxPoolLifetimeFlag.Name) {
 		cfg.Lifetime = ctx.GlobalDuration(TxPoolLifetimeFlag.Name)
+	}
+	if ctx.GlobalIsSet(TxPoolPrivateLifetimeFlag.Name) {
+		cfg.PrivateTxLifetime = ctx.GlobalDuration(TxPoolPrivateLifetimeFlag.Name)
 	}
 }
 
