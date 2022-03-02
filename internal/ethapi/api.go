@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -2216,11 +2218,19 @@ func (s *PrivateTxBundleAPI) SendMegabundle(ctx context.Context, args SendMegabu
 type BundleAPI struct {
 	b     Backend
 	chain *core.BlockChain
+
+	callBundlesQueueCond          *sync.Cond
+	currentCallBundlesSimulations int32
 }
 
 // NewBundleAPI creates a new Tx Bundle API instance.
 func NewBundleAPI(b Backend, chain *core.BlockChain) *BundleAPI {
-	return &BundleAPI{b, chain}
+	return &BundleAPI{
+		b:                             b,
+		chain:                         chain,
+		callBundlesQueueCond:          sync.NewCond(&sync.Mutex{}),
+		currentCallBundlesSimulations: 0,
+	}
 }
 
 // CallBundleArgs represents the arguments for a call.
@@ -2236,13 +2246,7 @@ type CallBundleArgs struct {
 	BaseFee                *big.Int              `json:"baseFee"`
 }
 
-// CallBundle will simulate a bundle of transactions at the top of a given block
-// number with the state of another (or the same) block. This can be used to
-// simulate future blocks with the current state, or it can be used to simulate
-// a past block.
-// The sender is responsible for signing the transactions and using the correct
-// nonce and ensuring validity
-func (s *BundleAPI) CallBundle(ctx context.Context, args CallBundleArgs) (map[string]interface{}, error) {
+func (s *BundleAPI) executeBundle(ctx context.Context, args CallBundleArgs) (map[string]interface{}, error) {
 	if len(args.Txs) == 0 {
 		return nil, errors.New("bundle missing txs")
 	}
@@ -2330,6 +2334,10 @@ func (s *BundleAPI) CallBundle(ctx context.Context, args CallBundleArgs) (map[st
 	var totalGasUsed uint64
 	gasFees := new(big.Int)
 	for i, tx := range txs {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("context closed")
+		}
+
 		coinbaseBalanceBeforeTx := state.GetBalance(coinbase)
 		state.Prepare(tx.Hash(), i)
 
@@ -2393,6 +2401,34 @@ func (s *BundleAPI) CallBundle(ctx context.Context, args CallBundleArgs) (map[st
 
 	ret["bundleHash"] = "0x" + common.Bytes2Hex(bundleHash.Sum(nil))
 	return ret, nil
+}
+
+var maxConcurrentBundleSimulations int32 = 8
+
+// CallBundle will simulate a bundle of transactions at the top of a given block
+// number with the state of another (or the same) block. This can be used to
+// simulate future blocks with the current state, or it can be used to simulate
+// a past block.
+// The sender is responsible for signing the transactions and using the correct
+// nonce and ensuring validity
+// The amt of bundles simulated in parallel is limited to maxConcurrentBundleSimulations
+func (s *BundleAPI) CallBundle(ctx context.Context, args CallBundleArgs) (map[string]interface{}, error) {
+	s.callBundlesQueueCond.L.Lock()
+	currentCallBundlesSimulations := atomic.AddInt32(&s.currentCallBundlesSimulations, 1)
+	if currentCallBundlesSimulations >= maxConcurrentBundleSimulations {
+		s.callBundlesQueueCond.Wait() // Woken up in order of Wait()
+	}
+	s.callBundlesQueueCond.L.Unlock()
+
+	defer func() {
+		s.callBundlesQueueCond.Signal()
+		atomic.AddInt32(&s.currentCallBundlesSimulations, -1)
+	}()
+
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("context closed")
+	}
+	return s.executeBundle(ctx, args)
 }
 
 // EstimateGasBundleArgs represents the arguments for a call
