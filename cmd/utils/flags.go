@@ -438,15 +438,12 @@ var (
 		Value:    ethconfig.Defaults.TxPool.Lifetime,
 		Category: flags.TxPoolCategory,
 	}
-<<<<<<< HEAD
 
-=======
-	TxPoolPrivateLifetimeFlag = cli.DurationFlag{
+	TxPoolPrivateLifetimeFlag = &cli.DurationFlag{
 		Name:  "txpool.privatelifetime",
 		Usage: "Maximum amount of time private transactions are withheld from public broadcasting",
 		Value: ethconfig.Defaults.TxPool.PrivateTxLifetime,
 	}
->>>>>>> master
 	// Performance tuning settings
 	CacheFlag = &cli.IntFlag{
 		Name:     "cache",
@@ -1612,11 +1609,11 @@ func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
 	if ctx.IsSet(TxPoolLifetimeFlag.Name) {
 		cfg.Lifetime = ctx.Duration(TxPoolLifetimeFlag.Name)
 	}
-	if ctx.GlobalIsSet(TxPoolPrivateLifetimeFlag.Name) {
-		cfg.PrivateTxLifetime = ctx.GlobalDuration(TxPoolPrivateLifetimeFlag.Name)
+	if ctx.IsSet(TxPoolPrivateLifetimeFlag.Name) {
+		cfg.PrivateTxLifetime = ctx.Duration(TxPoolPrivateLifetimeFlag.Name)
 	}
 
-	addresses := strings.Split(ctx.GlobalString(MinerTrustedRelaysFlag.Name), ",")
+	addresses := strings.Split(ctx.String(MinerTrustedRelaysFlag.Name), ",")
 	for _, address := range addresses {
 		if trimmed := strings.TrimSpace(address); !common.IsHexAddress(trimmed) {
 			Fatalf("Invalid account in --miner.trustedrelays: %s", trimmed)
@@ -1677,9 +1674,9 @@ func setMiner(ctx *cli.Context, cfg *miner.Config) {
 		log.Warn("The generic --miner.gastarget flag is deprecated and will be removed in the future!")
 	}
 
-	cfg.MaxMergedBundles = ctx.GlobalInt(MinerMaxMergedBundlesFlag.Name)
+	cfg.MaxMergedBundles = ctx.Int(MinerMaxMergedBundlesFlag.Name)
 
-	addresses := strings.Split(ctx.GlobalString(MinerTrustedRelaysFlag.Name), ",")
+	addresses := strings.Split(ctx.String(MinerTrustedRelaysFlag.Name), ",")
 	for _, address := range addresses {
 		if trimmed := strings.TrimSpace(address); !common.IsHexAddress(trimmed) {
 			Fatalf("Invalid account in --miner.trustedrelays: %s", trimmed)

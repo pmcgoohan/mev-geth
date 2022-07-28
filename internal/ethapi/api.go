@@ -1747,19 +1747,6 @@ func (s *TransactionAPI) SendRawTransaction(ctx context.Context, input hexutil.B
 	return SubmitTransaction(ctx, s.b, tx, false)
 }
 
-// SendPrivateRawTransaction will add the signed transaction to the transaction pool,
-// without broadcasting the transaction to its peers, and mark the transaction to avoid
-// future syncs.
-//
-// See SendRawTransaction.
-func (s *PublicTransactionPoolAPI) SendPrivateRawTransaction(ctx context.Context, input hexutil.Bytes) (common.Hash, error) {
-	tx := new(types.Transaction)
-	if err := tx.UnmarshalBinary(input); err != nil {
-		return common.Hash{}, err
-	}
-	return SubmitTransaction(ctx, s.b, tx, true)
-}
-
 // Sign calculates an ECDSA signature for:
 // keccak256("\x19Ethereum Signed Message:\n" + len(message) + message).
 //
